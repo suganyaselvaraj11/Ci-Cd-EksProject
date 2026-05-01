@@ -1,0 +1,8 @@
+# Maven build output
+target/
+
+# WAR files
+*.war
+
+# Java compiled files
+*.class
