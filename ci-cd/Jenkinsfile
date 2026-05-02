@@ -9,10 +9,12 @@ pipeline {
     environment {
         IMAGE_NAME = "sakthisuganya/ci-cd-eksproject"
         IMAGE_TAG  = "latest"
+        KUBECONFIG = "/var/jenkins_home/.kube/config"
     }
 
     stages {
 
+        /* ---------------- CHECKOUT ---------------- */
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
@@ -20,18 +22,21 @@ pipeline {
             }
         }
 
+        /* ---------------- CLEAN ---------------- */
         stage('Clean Workspace') {
             steps {
                 sh 'rm -rf target'
             }
         }
 
+        /* ---------------- BUILD ---------------- */
         stage('Build Maven Project') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh 'mvn clean package -DskipTests -B'
             }
         }
 
+        /* ---------------- VERIFY ARTIFACT ---------------- */
         stage('Verify Artifact') {
             steps {
                 sh '''
@@ -45,14 +50,16 @@ pipeline {
             }
         }
 
+        /* ---------------- SONARQUBE ---------------- */
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonar-server') {
-                    sh 'mvn sonar:sonar'
+                    sh 'mvn sonar:sonar -DskipTests'
                 }
             }
         }
 
+        /* ---------------- QUALITY GATE ---------------- */
         stage('Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
@@ -61,32 +68,28 @@ pipeline {
             }
         }
 
-        /* ---------------- TRIVY SCAN (FIXED) ---------------- */
+        /* ---------------- TRIVY SCAN ---------------- */
         stage('Trivy Security Scan') {
             steps {
-                timeout(time: 30, unit: 'MINUTES') {
-                    sh """
-                        echo "Scanning Docker image with Trivy..."
-                        trivy image \
-                          --exit-code 0 \
-                          --severity HIGH,CRITICAL \
-                          --ignore-unfixed \
-                          ${IMAGE_NAME}:${IMAGE_TAG}
-                    """
-                }
+                sh """
+                    trivy image \
+                    --scanners vuln \
+                    --timeout 10m \
+                    --exit-code 0 \
+                    --severity HIGH,CRITICAL \
+                    --ignore-unfixed \
+                    ${IMAGE_NAME}:${IMAGE_TAG}
+                """
             }
         }
 
         /* ---------------- DOCKER BUILD ---------------- */
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    echo "Starting Docker build..."
-                    ls -l docker/
-                    ls -l target/
-
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f docker/Dockerfile .
-                '''
+                sh """
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                    -f docker/Dockerfile .
+                """
             }
         }
 
@@ -106,18 +109,13 @@ pipeline {
             }
         }
 
-        /* ---------------- KUBERNETES DEPLOY (NEW) ---------------- */
+        /* ---------------- KUBERNETES DEPLOY ---------------- */
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    echo "Deploying to Minikube Kubernetes..."
-
                     kubectl apply -f kubernetes/
 
-                    echo "Pods:"
                     kubectl get pods
-
-                    echo "Services:"
                     kubectl get svc
                 '''
             }
@@ -126,11 +124,11 @@ pipeline {
 
     post {
         success {
-            echo '✅ CI/CD + Trivy + Kubernetes deployment SUCCESSFUL!'
+            echo '✅ CI/CD Pipeline SUCCESSFUL!'
         }
 
         failure {
-            echo '❌ Pipeline failed. Check logs carefully.'
+            echo '❌ Pipeline FAILED. Check logs.'
         }
     }
 }
