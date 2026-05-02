@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vprofile-ingress
+  namespace: vprofile
+spec:
+  rules:
+  - host: vprofile.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vprofile-app-service
+            port:
+              number: 80

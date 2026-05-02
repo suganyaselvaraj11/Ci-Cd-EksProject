@@ -61,6 +61,23 @@ pipeline {
             }
         }
 
+        /* ---------------- TRIVY SCAN (FIXED) ---------------- */
+        stage('Trivy Security Scan') {
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    sh """
+                        echo "Scanning Docker image with Trivy..."
+                        trivy image \
+                          --exit-code 0 \
+                          --severity HIGH,CRITICAL \
+                          --ignore-unfixed \
+                          ${IMAGE_NAME}:${IMAGE_TAG}
+                    """
+                }
+            }
+        }
+
+        /* ---------------- DOCKER BUILD ---------------- */
         stage('Build Docker Image') {
             steps {
                 sh '''
@@ -73,6 +90,7 @@ pipeline {
             }
         }
 
+        /* ---------------- DOCKER PUSH ---------------- */
         stage('Docker Login & Push') {
             steps {
                 withCredentials([usernamePassword(
@@ -82,17 +100,33 @@ pipeline {
                 )]) {
                     sh '''
                         echo "$PASS" | docker login -u "$USER" --password-stdin
-
                         docker push ${IMAGE_NAME}:${IMAGE_TAG}
                     '''
                 }
+            }
+        }
+
+        /* ---------------- KUBERNETES DEPLOY (NEW) ---------------- */
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                    echo "Deploying to Minikube Kubernetes..."
+
+                    kubectl apply -f kubernetes/
+
+                    echo "Pods:"
+                    kubectl get pods
+
+                    echo "Services:"
+                    kubectl get svc
+                '''
             }
         }
     }
 
     post {
         success {
-            echo '✅ CI/CD Pipeline completed successfully!'
+            echo '✅ CI/CD + Trivy + Kubernetes deployment SUCCESSFUL!'
         }
 
         failure {

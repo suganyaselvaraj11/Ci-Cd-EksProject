@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vprofile-app
+  namespace: vprofile
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: vprofile-app
+
+  template:
+    metadata:
+      labels:
+        app: vprofile-app
+
+    spec:
+         containers:
+         - name: vprofile-app
+           image: yourdockerhub/vprofile-app:latest
+           ports:
+            - containerPort: 8080
+           env:
+            - name: DB_HOST
+              value: vprofile-db
+
+            - name: MEMCACHED_HOST
+              value: vprofile-memcached
+
+            - name: RABBITMQ_HOST
+              value: vprofile-rabbitmq
+              envFrom:
+              - configMapRef:
+                name: vprofile-config
