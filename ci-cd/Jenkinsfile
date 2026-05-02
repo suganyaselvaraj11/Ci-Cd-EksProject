@@ -1,0 +1,102 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'maven3'
+        jdk 'JDK21'
+    }
+
+    environment {
+        IMAGE_NAME = "sakthisuganya/ci-cd-eksproject"
+        IMAGE_TAG  = "latest"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/suganyaselvaraj11/Ci-Cd-EksProject.git'
+            }
+        }
+
+        stage('Clean Workspace') {
+            steps {
+                sh 'rm -rf target'
+            }
+        }
+
+        stage('Build Maven Project') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Verify Artifact') {
+            steps {
+                sh '''
+                    echo "Workspace:"
+                    pwd
+                    ls -l
+
+                    echo "Target folder:"
+                    ls -l target/
+                '''
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    echo "Starting Docker build..."
+                    ls -l docker/
+                    ls -l target/
+
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f docker/Dockerfile .
+                '''
+            }
+        }
+
+        stage('Docker Login & Push') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    sh '''
+                        echo "$PASS" | docker login -u "$USER" --password-stdin
+
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ CI/CD Pipeline completed successfully!'
+        }
+
+        failure {
+            echo '❌ Pipeline failed. Check logs carefully.'
+        }
+    }
+}
