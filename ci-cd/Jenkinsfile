@@ -9,6 +9,8 @@ pipeline {
     environment {
         IMAGE_NAME = "sakthisuganya/ci-cd-eksproject"
         IMAGE_TAG  = "latest"
+
+        // IMPORTANT: ensures kubectl uses correct cluster config
         KUBECONFIG = "/var/jenkins_home/.kube/config"
     }
 
@@ -68,6 +70,16 @@ pipeline {
             }
         }
 
+        /* ---------------- DOCKER BUILD ---------------- */
+        stage('Build Docker Image') {
+            steps {
+                sh """
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                    -f docker/Dockerfile .
+                """
+            }
+        }
+
         /* ---------------- TRIVY SCAN ---------------- */
         stage('Trivy Security Scan') {
             steps {
@@ -79,16 +91,6 @@ pipeline {
                     --severity HIGH,CRITICAL \
                     --ignore-unfixed \
                     ${IMAGE_NAME}:${IMAGE_TAG}
-                """
-            }
-        }
-
-        /* ---------------- DOCKER BUILD ---------------- */
-        stage('Build Docker Image') {
-            steps {
-                sh """
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} \
-                    -f docker/Dockerfile .
                 """
             }
         }
@@ -109,14 +111,35 @@ pipeline {
             }
         }
 
-        /* ---------------- KUBERNETES DEPLOY ---------------- */
+        /* ---------------- KUBERNETES CHECK ---------------- */
+        stage('Kubernetes Cluster Check') {
+            steps {
+                sh '''
+                    export KUBECONFIG=/var/jenkins_home/.kube/config
+
+                    echo "Checking cluster..."
+                    kubectl cluster-info
+                    kubectl get nodes
+                '''
+            }
+        }
+
+        /* ---------------- DEPLOY ---------------- */
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
+                    export KUBECONFIG=/var/jenkins_home/.kube/config
+
+                    echo "Deploying application..."
                     kubectl apply -f kubernetes/
 
+                    echo "Pods:"
                     kubectl get pods
+
+                    echo "Services:"
                     kubectl get svc
+
+                    kubectl rollout status deployment --all
                 '''
             }
         }
@@ -124,11 +147,11 @@ pipeline {
 
     post {
         success {
-            echo '✅ CI/CD Pipeline SUCCESSFUL!'
+            echo "✅ CI/CD Pipeline SUCCESSFUL!"
         }
 
         failure {
-            echo '❌ Pipeline FAILED. Check logs.'
+            echo "❌ Pipeline FAILED. Check logs carefully."
         }
     }
 }
