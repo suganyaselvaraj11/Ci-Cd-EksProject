@@ -35,9 +35,8 @@ docker-compose.override.yml
 # =====================
 jenkins_home/
 
-# =====================
-# Terraform (if you add later)
-# =====================
+#  Terraform
+terraform/.terraform/
 *.tfstate
 *.tfstate.*
 .terraform/
