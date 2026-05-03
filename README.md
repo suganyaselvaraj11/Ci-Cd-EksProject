@@ -11,10 +11,11 @@ The application simulates a real-world production environment with multiple serv
 
 ## 🏗️ Architecture Overview
 
-User → Nginx → Tomcat (Java App) → MySQL  
-                      ↓  
-             Memcached + RabbitMQ  
+CI/CD PIPELINE
+Developer → GitHub → Jenkins → Maven → SonarQube → Docker → Trivy → Docker Hub → Kubernetes (EKS)
 
+MONITORING
+Kubernetes → Prometheus → Grafana
 ---
 
 ## ⚙️ DevOps Workflow
