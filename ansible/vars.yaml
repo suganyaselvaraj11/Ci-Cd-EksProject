@@ -1,0 +1,4 @@
+cluster_name: devops-eks-cluster
+region: ap-south-1
+namespace: devops
+k8s_path: ../k8s/app

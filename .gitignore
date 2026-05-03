@@ -1,8 +1,61 @@
-# Maven build output
+# =====================
+# Java / Maven
+# =====================
 target/
-
-# WAR files
+*.jar
 *.war
-
-# Java compiled files
 *.class
+
+# =====================
+# Logs
+# =====================
+*.log
+logs/
+
+# =====================
+# IDEs
+# =====================
+.idea/
+.vscode/
+*.iml
+
+# =====================
+# OS files
+# =====================
+.DS_Store
+Thumbs.db
+
+# =====================
+# Docker
+# =====================
+docker-compose.override.yml
+
+# =====================
+# Jenkins (local artifacts)
+# =====================
+jenkins_home/
+
+# =====================
+# Terraform (if you add later)
+# =====================
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# =====================
+# Kubernetes temp files
+# =====================
+*.kubeconfig
+
+# =====================
+# Secrets (VERY IMPORTANT)
+# =====================
+.env
+*.pem
+*.key
+*.p12
+
+# =====================
+# Vagrant (since you're skipping it)
+# =====================
+.vagrant/

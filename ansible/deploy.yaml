@@ -1,0 +1,41 @@
+- name: Deploy Application to EKS (devops-eks)
+  hosts: local
+  gather_facts: no
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+
+    - name: Configure kubeconfig for EKS
+      command: >
+        aws eks update-kubeconfig
+        --region {{ region }}
+        --name {{ cluster_name }}
+
+    - name: Verify cluster connection
+      command: kubectl get nodes
+      register: nodes_output
+
+    - debug:
+        var: nodes_output.stdout
+
+    - name: Create namespace
+      command: kubectl apply -f {{ k8s_path }}/namespace.yaml
+
+    - name: Deploy application
+      command: kubectl apply -f {{ k8s_path }}/deployment.yaml
+
+    - name: Create LoadBalancer service
+      command: kubectl apply -f {{ k8s_path }}/service.yaml
+
+    - name: Wait for external IP
+      command: kubectl get svc -n {{ namespace }}
+      register: svc_output
+      retries: 10
+      delay: 15
+      until: "'<pending>' not in svc_output.stdout"
+
+    - name: Show service details
+      debug:
+        var: svc_output.stdout

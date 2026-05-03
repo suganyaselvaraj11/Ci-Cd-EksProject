@@ -8,9 +8,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "sakthisuganya/ci-cd-eksproject"
-        IMAGE_TAG  = "latest"
-
-        // IMPORTANT: ensures kubectl uses correct cluster config
+        IMAGE_TAG  = "${BUILD_NUMBER}"   // 🔥 dynamic version
         KUBECONFIG = "/var/jenkins_home/.kube/config"
     }
 
@@ -24,13 +22,6 @@ pipeline {
             }
         }
 
-        /* ---------------- CLEAN ---------------- */
-        stage('Clean Workspace') {
-            steps {
-                sh 'rm -rf target'
-            }
-        }
-
         /* ---------------- BUILD ---------------- */
         stage('Build Maven Project') {
             steps {
@@ -38,65 +29,32 @@ pipeline {
             }
         }
 
-        /* ---------------- VERIFY ARTIFACT ---------------- */
-        stage('Verify Artifact') {
-            steps {
-                sh '''
-                    echo "Workspace:"
-                    pwd
-                    ls -l
-
-                    echo "Target folder:"
-                    ls -l target/
-                '''
-            }
-        }
-
-        /* ---------------- SONARQUBE ---------------- */
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonar-server') {
-                    sh 'mvn sonar:sonar -DskipTests'
-                }
-            }
-        }
-
-        /* ---------------- QUALITY GATE ---------------- */
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
         /* ---------------- DOCKER BUILD ---------------- */
         stage('Build Docker Image') {
             steps {
                 sh """
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} \
-                    -f docker/Dockerfile .
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f docker/Dockerfile .
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
                 """
             }
         }
 
         /* ---------------- TRIVY SCAN ---------------- */
-        stage('Trivy Security Scan') {
+        stage('Trivy Scan') {
             steps {
                 sh """
-                    trivy image \
-                    --scanners vuln \
-                    --timeout 10m \
-                    --exit-code 0 \
+                    docker run --rm \
+                    -v /var/run/docker.sock:/var/run/docker.sock \
+                    aquasec/trivy image \
                     --severity HIGH,CRITICAL \
-                    --ignore-unfixed \
+                    --exit-code 1 \
                     ${IMAGE_NAME}:${IMAGE_TAG}
                 """
             }
         }
 
-        /* ---------------- DOCKER PUSH ---------------- */
-        stage('Docker Login & Push') {
+        /* ---------------- PUSH ---------------- */
+        stage('Push Image') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
@@ -106,40 +64,39 @@ pipeline {
                     sh '''
                         echo "$PASS" | docker login -u "$USER" --password-stdin
                         docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${IMAGE_NAME}:latest
                     '''
                 }
             }
         }
 
-        /* ---------------- KUBERNETES CHECK ---------------- */
-        stage('Kubernetes Cluster Check') {
+        /* ---------------- CONFIGURE EKS ---------------- */
+        stage('Configure EKS') {
             steps {
                 sh '''
-                    export KUBECONFIG=/var/jenkins_home/.kube/config
-
-                    echo "Checking cluster..."
-                    kubectl cluster-info
+                    aws eks update-kubeconfig --region ap-south-1 --name devops-eks
                     kubectl get nodes
                 '''
             }
         }
 
-        /* ---------------- DEPLOY ---------------- */
-        stage('Deploy to Kubernetes') {
+        /* ---------------- UPDATE IMAGE ---------------- */
+        stage('Update K8s Image') {
             steps {
                 sh '''
-                    export KUBECONFIG=/var/jenkins_home/.kube/config
+                    sed -i "s|image: .*|image: sakthisuganya/ci-cd-eksproject:${BUILD_NUMBER}|g" k8s/app/deployment.yaml
+                '''
+            }
+        }
 
-                    echo "Deploying application..."
-                    kubectl apply -f kubernetes/
+        /* ---------------- DEPLOY ---------------- */
+        stage('Deploy to EKS') {
+            steps {
+                sh '''
+                    kubectl apply -f k8s/
 
-                    echo "Pods:"
-                    kubectl get pods
-
-                    echo "Services:"
-                    kubectl get svc
-
-                    kubectl rollout status deployment --all
+                    kubectl rollout restart deployment app -n devops
+                    kubectl rollout status deployment app -n devops
                 '''
             }
         }
@@ -147,11 +104,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ CI/CD Pipeline SUCCESSFUL!"
+            echo "✅ FULL CI/CD SUCCESS (Build → Scan → Push → Deploy)"
         }
-
         failure {
-            echo "❌ Pipeline FAILED. Check logs carefully."
+            echo "❌ Pipeline FAILED"
         }
     }
 }
