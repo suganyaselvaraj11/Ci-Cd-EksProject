@@ -15,7 +15,7 @@ spec:
     spec:
      containers:
         - name: app
-          image: sakthisuganya/ci-cd-eksproject:latest
+          image: sakthisuganya/ci-cd-eksproject:vprofile-container
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
