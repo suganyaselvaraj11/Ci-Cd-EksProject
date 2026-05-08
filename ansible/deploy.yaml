@@ -24,10 +24,10 @@
       command: kubectl apply -f {{ k8s_path }}/namespace.yaml
 
     - name: Deploy application
-      command: kubectl apply -f {{ k8s_path }}/deployment.yaml
+      command: kubectl apply -f {{ k8s_path }}/app-deployment.yaml
 
     - name: Create LoadBalancer service
-      command: kubectl apply -f {{ k8s_path }}/service.yaml
+      command: kubectl apply -f {{ k8s_path }}/app-service.yaml
 
     - name: Wait for external IP
       command: kubectl get svc -n {{ namespace }}
