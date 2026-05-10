@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "sakthisuganya/ci-cd-eksproject"
-        IMAGE_TAG  = "${BUILD_NUMBER}"   // 🔥 dynamic version
+        IMAGE_TAG  = "${BUILD_NUMBER}"   //
         KUBECONFIG = "/var/jenkins_home/.kube/config"
     }
 
@@ -102,10 +102,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ FULL CI/CD SUCCESS (Build → Scan → Push → Deploy)"
+            echo "FULL CI/CD SUCCESS (Build → Scan → Push → Deploy)"
         }
         failure {
-            echo "❌ Pipeline FAILED"
+            echo " Pipeline FAILED"
         }
     }
 }
